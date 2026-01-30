@@ -1,0 +1,11 @@
+name = "ryden-core"
+main = "src/index.ts"
+compatibility_date = "2026-01-30"
+
+[vars]
+OPENROUTER_MODEL = "google/gemini-2.0-flash-lite-preview-02-05:free"
+
+# Inko Cloudflare Dashboard se "Secrets" mein dalna
+# OPENROUTER_KEY = "sk-or-..."
+# MASTER_RYDEN_KEY = "RYDEN_ABC..."
+# DATABASE_URL = "postgres://..."
