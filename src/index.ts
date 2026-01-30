@@ -1,37 +1,59 @@
+// ryden-core/src/index.ts
 export default {
   async fetch(request: Request, env: any) {
-    const { method } = request;
     const url = new URL(request.url);
+    const method = request.method;
 
-    // MASTER AUTH FOR MINDEN & OTHERS
-    const authHeader = request.headers.get("Authorization");
-    if (authHeader !== `Bearer ${env.MASTER_RYDEN_KEY}`) {
-      return new Response("UNAUTHORIZED_DRAGON_GATE", { status: 401 });
+    // --- 1. REDDIT OAUTH REDIRECT ---
+    if (url.pathname === "/auth/reddit") {
+      const state = url.searchParams.get("clerk_id"); // Passing Clerk ID to track user
+      const redditAuthUrl = `https://www.reddit.com/api/v1/authorize?client_id=${env.REDDIT_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${env.REDIRECT_URI}&duration=permanent&scope=submit,identity,edit`;
+      return Response.redirect(redditAuthUrl);
     }
 
-    // REDDIT ENGAGEMENT ENDPOINT
-    if (url.pathname === "/api/v1/reddit/post" && method === "POST") {
-      const { systemPrompt, subreddits } = await request.json();
+    // --- 2. OAUTH CALLBACK (Handling Code from Reddit) ---
+    if (url.pathname === "/auth/reddit/callback") {
+      const code = url.searchParams.get("code");
+      const clerk_id = url.searchParams.get("state");
 
-      // 1. Get Content from OpenRouter
-      const aiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      // Exchange code for Access Token
+      const tokenResponse = await fetch("https://www.reddit.com/api/v1/access_token", {
         method: "POST",
-        headers: { "Authorization": `Bearer ${env.OPENROUTER_KEY}`, "Content-Type": "application/json" },
+        headers: {
+          "Authorization": `Basic ${btoa(env.REDDIT_CLIENT_ID + ":" + env.REDDIT_CLIENT_SECRET)}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: `grant_type=authorization_code&code=${code}&redirect_uri=${env.REDIRECT_URI}`,
+      });
+
+      const tokens: any = await tokenResponse.json();
+
+      // SAVE TO NEON DB (Using fetch to Neon HTTP API or your DB proxy)
+      await fetch(`${env.DB_HTTP_URL}/execute`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${env.DB_API_KEY}` },
         body: JSON.stringify({
-          model: env.OPENROUTER_MODEL,
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: "Create a viral reddit thread." }]
+          sql: "INSERT INTO users_config (clerk_id, reddit_access_token, reddit_refresh_token) VALUES ($1, $2, $3) ON CONFLICT (clerk_id) DO UPDATE SET reddit_access_token = $2, reddit_refresh_token = $3",
+          params: [clerk_id, tokens.access_token, tokens.refresh_token]
         })
       });
 
-      const aiData: any = await aiResponse.json();
-      const postContent = aiData.choices[0].message.content;
-
-      // TODO: Add Reddit OAuth Logic here
-      return new Response(JSON.stringify({ status: "success", content: postContent }), {
-        headers: { "content-type": "application/json" }
-      });
+      return new Response("REDDIT_CONNECTED_RYDEN_ACTIVE. Close this tab.");
     }
 
-    return new Response("RYDEN_CORE_ONLINE");
+    // --- 3. EXECUTE ACTION (For MINDEN/External Tools) ---
+    if (url.pathname === "/api/v1/execute" && method === "POST") {
+      const clientKey = request.headers.get("X-RYDEN-KEY");
+      
+      // Verification Logic
+      // 1. Hash clientKey
+      // 2. Query Neon DB to find which clerk_id owns this key
+      // 3. Get that user's Reddit Token
+      // 4. Call OpenRouter -> Post to Reddit
+      
+      return new Response(JSON.stringify({ status: "Processing" }));
+    }
+
+    return new Response("RYDEN_CORE_v1_READY");
   }
 };
