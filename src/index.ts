@@ -1,64 +1,45 @@
-// src/index.ts (BACKEND - Full Code)
-import { handleAuth, handleCallback, getTrendingDiscussions, generateSmartReply, postComment } from './adapters/reddit';
-import { createKey, verifyKey } from './auth/keyManager';
+// src/index.ts (BACKEND - ZERO TOUCH VERSION)
+import { handleRedditAuth, handleRedditCallback, redditActions } from './adapters/reddit';
+import { xActions } from './adapters/x';
+import { verifyAppKey } from './auth/keyManager';
 
 export default {
   async fetch(request: Request, env: any) {
     const url = new URL(request.url);
-    const method = request.method;
-
-    // CORS Headers for Frontend
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, X-RYDEN-KEY",
+      "Access-Control-Allow-Headers": "Content-Type, X-RYDEN-APP-KEY",
     };
 
-    if (method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+    if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-    // --- ROUTE: Key Management ---
-    if (url.pathname === "/api/v1/keys/create" && method === "POST") {
-      return createKey(request, env);
+    // 🛡️ CENTRAL AUTH GATEWAY
+    const appKey = request.headers.get("X-RYDEN-APP-KEY");
+    const isPublicRoute = url.pathname.includes("/auth/");
+    
+    if (!isPublicRoute && (!appKey || !await verifyAppKey(appKey, env))) {
+      return new Response(JSON.stringify({ error: "UNAUTHORIZED_ACCESS" }), { status: 401, headers: corsHeaders });
     }
 
-    // --- ROUTE: Reddit Auth ---
-    if (url.pathname === "/auth/reddit") return handleAuth(request, env);
-    if (url.pathname === "/auth/reddit/callback") return handleCallback(request, env);
-
-    // --- ROUTE: Brain Trigger (The Auto-Engage Node) ---
-    if (url.pathname === "/api/v1/auto-engage" && method === "POST") {
-      const clientKey = request.headers.get("X-RYDEN-KEY");
-      if (!clientKey || !await verifyKey(clientKey, env)) {
-        return new Response("Unauthorized Key", { status: 401 });
+    // 🚦 MODULAR ROUTING SYSTEM
+    try {
+      // REDDIT ROUTES
+      if (url.pathname.startsWith("/auth/reddit")) {
+        if (url.pathname === "/auth/reddit") return handleRedditAuth(request, env);
+        return handleRedditCallback(request, env);
       }
 
-      const { subreddit, clerk_id } = await request.json();
-
-      try {
-        // 1. Fetch Trending Posts
-        const trends = await getTrendingDiscussions(subreddit);
-        const topPost = trends[0];
-
-        // 2. AI decides the reply
-        const smartReply = await generateSmartReply(topPost.title, topPost.text, env);
-
-        // 3. Get user's token from DB and post
-        // Note: For now, it logs the action. Actual post needs the Reddit Client ID.
-        console.log(`RYDEN acting on post: ${topPost.title}`);
-        console.log(`Generated Intelligence: ${smartReply}`);
-
-        return new Response(JSON.stringify({
-          status: "SUCCESS",
-          action: "COMMENT_GENERATED",
-          target: topPost.url,
-          preview: smartReply
-        }), { headers: corsHeaders });
-
-      } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+      // X (TWITTER) ROUTES
+      if (url.pathname.startsWith("/api/v1/x")) {
+        return xActions(request, env);
       }
+
+      // FUTURE PLATFORMS (LinkedIn/Insta) YAHAN ADD HONGE WITHOUT BREAKING OTHERS
+      
+      return new Response("RYDEN_MASTER_SYSTEM_v2.0_ONLINE", { headers: corsHeaders });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
     }
-
-    return new Response("RYDEN_CORE_v1.2_ACTIVE", { headers: corsHeaders });
   }
 };
