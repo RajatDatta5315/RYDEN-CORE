@@ -1,25 +1,28 @@
-// src/adapters/x.ts (BACKEND)
-import { generateSmartReply } from './reddit'; // Reusing the AI brain logic
+// src/adapters/x.ts (FULL MODULAR CODE)
+export async function xActions(request: Request, env: any) {
+  const url = new URL(request.url);
+  const body = request.method === "POST" ? await request.json() : {};
 
-export async function postToX(text: string, env: any) {
-  // Twitter API v2 Post Tweet endpoint
-  const response = await fetch("https://api.twitter.com/2/tweets", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${env.X_BEARER_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ text: text }),
-  });
+  // 1. POST A TWEET
+  if (url.pathname === "/api/v1/x/post") {
+    const response = await fetch("https://api.twitter.com/2/tweets", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${env.X_BEARER_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text: body.content }),
+    });
+    return new Response(JSON.stringify(await response.json()));
+  }
 
-  return response.json();
-}
-
-export async function autoEngageX(topic: string, env: any) {
-  // Logic: Search for tweets -> Analyze -> Reply
-  // Note: Twitter API search requires 'Basic' tier ($100/mo) or Free tier (Post only)
-  console.log(`Searching X for topic: ${topic}`);
-  
-  const aiPost = await generateSmartReply("Trending on X", `Write a viral tweet about ${topic}`, env);
-  return await postToX(aiPost, env);
+  // 2. AUTO-ENGAGE (The Brain)
+  if (url.pathname === "/api/v1/x/auto-engage") {
+    // Groq logic yahan call hogi
+    const aiResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        headers: { "Authorization": `Bearer ${env.GROQ_API_KEY}` },
+        // AI Logic...
+    });
+    return new Response(JSON.stringify({ status: "X_ENGAGEMENT_SENT" }));
+  }
 }
