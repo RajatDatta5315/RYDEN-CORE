@@ -36,14 +36,18 @@ export default {
         return xActions(request, env);
       }
 
-      if (path === "/api/automate") {
-  const { userId, platform, action } = await request.json();
+      if (url.pathname === "/api/automate") {
+      const body: any = await request.json();
+      const { userId, platform, action } = body;
   
-  if (platform === "telegram") {
-    const result = await handleTelegramAction(userId, action, env);
-    return new Response(JSON.stringify(result), { headers: { "Content-Type": "application/json" } });
+       if (platform === "telegram") {
+       const result = await handleTelegramAction(userId, action, env);
+         return new Response(JSON.stringify(result), { 
+      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+    });
   }
 }
+
       // FUTURE PLATFORMS (LinkedIn/Insta) YAHAN ADD HONGE WITHOUT BREAKING OTHERS
       
       return new Response("RYDEN_MASTER_SYSTEM_v2.0_ONLINE", { headers: corsHeaders });
