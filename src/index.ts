@@ -2,6 +2,7 @@
 import { handleRedditAuth, handleRedditCallback, redditActions } from './adapters/reddit';
 import { xActions } from './adapters/x';
 import { verifyAppKey } from './auth/keyManager';
+import { handleTelegramAction } from './adapters/telegram';
 
 export default {
   async fetch(request: Request, env: any) {
@@ -35,6 +36,14 @@ export default {
         return xActions(request, env);
       }
 
+      if (path === "/api/automate") {
+  const { userId, platform, action } = await request.json();
+  
+  if (platform === "telegram") {
+    const result = await handleTelegramAction(userId, action, env);
+    return new Response(JSON.stringify(result), { headers: { "Content-Type": "application/json" } });
+  }
+}
       // FUTURE PLATFORMS (LinkedIn/Insta) YAHAN ADD HONGE WITHOUT BREAKING OTHERS
       
       return new Response("RYDEN_MASTER_SYSTEM_v2.0_ONLINE", { headers: corsHeaders });
