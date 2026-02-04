@@ -9,3 +9,15 @@ OPENROUTER_MODEL = "google/gemini-2.0-flash-lite-preview-02-05:free"
 # OPENROUTER_KEY = "sk-or-..."
 # MASTER_RYDEN_KEY = "RYDEN_ABC..."
 # DATABASE_URL = "postgres://..."
+name = "ryden-core"
+main = "src/index.ts"
+compatibility_date = "2026-01-30"
+
+[vars]
+OPENROUTER_MODEL = "google/gemini-2.0-flash-lite-preview-02-05:free"
+
+# Database Binding
+[[d1_databases]]
+binding = "DB" # Ye "DB" naam hi hum code mein use karenge
+database_name = "ryden_db"
+database_id = "TERA_D1_DATABASE_ID_YAHAN_DALO" # Dashboard se copy kar
