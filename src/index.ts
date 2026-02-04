@@ -1,7 +1,6 @@
-// src/index.ts (BACKEND - FULL VERSION)
 import { handleRedditAuth, handleRedditCallback, redditActions } from './adapters/reddit';
 import { xActions } from './adapters/x';
-import { verifyAppKey } from './auth/keyManager';
+import { verifyAppKey, generateUserKeys } from './auth/keyManager'; // Added generateUserKeys
 import { handleTelegramAction } from './adapters/telegram';
 
 export default {
@@ -17,30 +16,45 @@ export default {
 
     // 🛡️ CENTRAL AUTH GATEWAY
     const appKey = request.headers.get("X-RYDEN-APP-KEY");
-    const isPublicRoute = url.pathname.includes("/auth/");
+    // Keys fetch karne ke liye hume public check thoda relax karna padega initial call ke liye
+    const isPublicRoute = url.pathname.includes("/auth/") || url.pathname === "/api/keys";
     
     if (!isPublicRoute && (!appKey || !await verifyAppKey(appKey, env))) {
       return new Response(JSON.stringify({ error: "UNAUTHORIZED_ACCESS" }), { status: 401, headers: corsHeaders });
     }
 
     try {
+      // 🔑 KEY MANAGEMENT ROUTE (New)
+      if (url.pathname === "/api/keys" && request.method === "POST") {
+        const { userId } = await request.json();
+        
+        // Check if exists
+        const existing = await env.DB.prepare(
+          "SELECT app_key, app_secret FROM user_keys WHERE clerk_id = ?"
+        ).bind(userId).first();
+
+        if (existing) {
+          return new Response(JSON.stringify(existing), { headers: corsHeaders });
+        }
+
+        // Generate and Save if not
+        const newKeys = await generateUserKeys(userId, env);
+        return new Response(JSON.stringify(newKeys), { headers: corsHeaders });
+      }
+
       // 🚦 MODULAR ROUTING SYSTEM
-      
-      // REDDIT ROUTES
       if (url.pathname.startsWith("/auth/reddit")) {
         if (url.pathname === "/auth/reddit") return handleRedditAuth(request, env);
         return handleRedditCallback(request, env);
       }
 
-      // X (TWITTER) ROUTES
       if (url.pathname.startsWith("/api/v1/x")) {
         return xActions(request, env);
       }
 
-      // TELEGRAM & AUTOMATION ROUTES
       if (url.pathname === "/api/automate") {
         const body: any = await request.json();
-        const { userId, platform, action, payload } = body; // Included payload
+        const { userId, platform, action, payload } = body;
   
         if (platform === "telegram") {
           const result = await handleTelegramAction(userId, action, env, payload);
