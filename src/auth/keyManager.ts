@@ -1,11 +1,17 @@
-// src/auth/keyManager.ts
+export const generateUserKeys = async (clerkId: string, env: any) => {
+  // Simple but secure key generation using Web Crypto API
+  const encoder = new TextEncoder();
+  const data = encoder.encode(clerkId + Date.now().toString());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  
+  const appKey = `rk_live_${clerkId.substring(0, 8)}_${Math.random().toString(36).substring(7)}`;
+  const appSecret = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
 
-export async function verifyAppKey(key: string, env: any) {
-  // Verification logic with Neon can go here
-  return key.startsWith("rk_live_");
-}
+  // Auto-save to Cloudflare D1
+  await env.DB.prepare(
+    "INSERT INTO user_keys (clerk_id, app_key, app_secret) VALUES (?, ?, ?) ON CONFLICT (clerk_id) DO UPDATE SET app_key = ?, app_secret = ?"
+  ).bind(clerkId, appKey, appSecret, appKey, appSecret).run();
 
-export async function createKey(request: Request, env: any) {
-  const rawKey = `rk_live_${crypto.randomUUID().replace(/-/g, '')}`;
-  return new Response(JSON.stringify({ key: rawKey }));
-}
+  return { appKey, appSecret };
+};
