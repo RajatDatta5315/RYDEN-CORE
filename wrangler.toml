@@ -9,3 +9,17 @@ OPENROUTER_MODEL = "google/gemini-2.0-flash-lite-preview-02-05:free"
 binding = "DB"
 database_name = "ryden_db"
 database_id = "041747db-997f-499b-8b64-e79c51405f1d"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# Secrets to set via wrangler secret put:
+# GROQ_API_KEY
+# X_API_KEY
+# X_API_SECRET
+# X_ACCESS_TOKEN
+# X_ACCESS_TOKEN_SECRET
+# REDDIT_CLIENT_ID
+# REDDIT_CLIENT_SECRET
+# REDDIT_REDIRECT_URI
